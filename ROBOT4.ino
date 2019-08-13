@@ -225,7 +225,7 @@ void prinimaem() {//////////////////////////////////////////////////////////////
   if (comandaRX == 119 and dataRX == 10) myIMU.enableGameRotationVector(50), IMUen = 1;   //def:50 - Send data update every 50ms myIMU.enableRotationVector(200) or enableGameRotationVector
   if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;      //def:50 - Send data update every 50ms  '''REMOVE, NOT NEEDED'''
   if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                     //Move LIDAR
-  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) GetDist();                      //Get DISTANCE GetDist()
+  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDistance();                      //Get DISTANCE getDistance()
   if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();  //Get Battery's Voltage
   if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                 //Get hatch status
   if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) TurnRight();
@@ -282,7 +282,7 @@ void moveLIDAR() {     /////////////////////// Rotate Lidar ////////////////////
   comandaRX = 0;
 }
 
-void GetDist() {     /////////////////////// Distance /////////////////////////
+void getDistance() {     /////////////////////// Distance /////////////////////////
   // hotya tut vrode mozhno  while (Serial3.available())  char t = Serial3.read();    //purge tfmini's serial
   //delay(40);
   int distance = 0;
