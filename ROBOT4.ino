@@ -77,7 +77,7 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000L);              //400000
   comandaTX = 98, dataTX = random(0, 65000), posilka(), delay(20); // dlya nachala propihnut`, esli connection uzhe lost
-  HatchStatus();                      //Check and update `hatch` var
+  hatchStatus();                      //Check and update `hatch` var
   gpio_write_bit(GPIOB, 9, 0);        //PWMservo power Enable
   pwmController.resetDevices();       // Software resets all PCA9685 devices on Wire line
   pwmController.init(B000000);        // Address pins A5-A0 set to B000000
@@ -227,7 +227,7 @@ void prinimaem() {//////////////////////////////////////////////////////////////
   if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                     //Move LIDAR
   if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) GetDist();                      //Get DISTANCE GetDist()
   if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();  //Get Battery's Voltage
-  if ((comandaRX == 21) and (dataRX == 21)) HatchStatus();                                 //Get hatch status
+  if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                 //Get hatch status
   if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) TurnRight();
   if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) TurnLeft();
   //  uint16_t strength = tfmini.getRecentSignalStrength();
@@ -328,7 +328,7 @@ void getTFminiData(int* distance, int* strength) {  /////////////////////// RANG
   }
 }
 
-void HatchStatus() {  /////////////////////// Hatch /////////////////////////
+void hatchStatus() {  /////////////////////// Hatch /////////////////////////
   hatch = 3;                          // def-dummy
   pinMode(PF3, INPUT);                // Hatch
   pinMode(PF5, INPUT);                // Hatch
@@ -342,7 +342,7 @@ void HatchStatus() {  /////////////////////// Hatch /////////////////////////
 
 void OPENUP() { /////////////////////// OPENUP /////////////////////////
   gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 1), delay(3000), hatch = 1;  //Open hatch
-  HatchStatus();
+  hatchStatus();
   if (hatch == 1) pwmController.setChannelPWM(11, 456), gpio_write_bit(GPIOB, 0, 1), servo.LED(5, &rgb[0]), LIDAR = 1;
   //while (Serial1.available())  char t = Serial1.read();  //purge main serial
 }
