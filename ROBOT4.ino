@@ -335,7 +335,7 @@ void OPENUP() {//=================================================== OPENUP ====
 
   while ((millis() - mili) < 3000) {   // zamecheno overcurrent = 3210
     delay(50);
-    if (analogRead(PC1) > 3210) {
+    if (analogRead(PC1) > 3210) {      // Over-current!
       gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 0);
       comandaTX = 21, dataTX = 4,  posilka();
       errorBeep();
@@ -354,7 +354,7 @@ void CLOSEDOWN() {//================================================ CLOSEDOWN =
 
   while ((millis() - mili) < 3800) {   // zamecheno overcurrent = 3210
     delay(50);
-    if (analogRead(PC1) > 3210) {
+    if (analogRead(PC1) > 3210) {      // Over-current!
       gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 0);
       comandaTX = 21, dataTX = 4,  posilka();
       errorBeep();
@@ -402,7 +402,7 @@ void turnRight() {//================================================AUTO Turn RI
       oldYAW = heading, getYAW();
       if (oldYAW == heading) neKrutitsa ++;
       if (oldYAW != heading) neKrutitsa = 0;
-      if (neKrutitsa >= 33){
+      if (neKrutitsa >= 33){                                                  //Doesn't turn?
         comandaTX = 32, dataTX = 1000, posilka();
         errorBeep();
         goto vse;
@@ -416,7 +416,7 @@ void turnRight() {//================================================AUTO Turn RI
     oldYAW = heading, getYAW();
     if (oldYAW == heading) neKrutitsa ++;
     if (oldYAW != heading) neKrutitsa = 0;
-    if (neKrutitsa >= 33){
+    if (neKrutitsa >= 33){                                                    //Doesn't turn?
       comandaTX = 32, dataTX = 1000, posilka();
       errorBeep();
       goto vse;
@@ -448,7 +448,7 @@ void turnLeft() {//================================================AUTO Turn LEF
       oldYAW = heading, getYAW();
       if (oldYAW == heading) neKrutitsa ++;
       if (oldYAW != heading) neKrutitsa = 0;
-      if (neKrutitsa >= 33) {
+      if (neKrutitsa >= 33) {                                                 //Doesn't turn?
         comandaTX = 33, dataTX = 1000, posilka();
         errorBeep();
         goto vse;
@@ -462,7 +462,7 @@ void turnLeft() {//================================================AUTO Turn LEF
     oldYAW = heading, getYAW();
     if (oldYAW == heading) neKrutitsa ++;
     if (oldYAW != heading) neKrutitsa = 0;    
-    if (neKrutitsa >= 33) {
+    if (neKrutitsa >= 33) {                                                   //Doesn't turn? 
       comandaTX = 33, dataTX = 1000, posilka();
       errorBeep();
       goto vse;
