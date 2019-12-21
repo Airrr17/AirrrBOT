@@ -14,7 +14,7 @@
 
 unsigned int voltage = 0, rpm = 0, rpm2 = 0, rpm_old, rpm2_old, dataRX = 0, dataTX, servPOS = 0, current_lidar = 501, headingTemp = 0; //0-65535
 int bias, pwmR = 0, pwmL = 0, heading = 0, TargetTurn = 0;                                                                             //-32768 - 32767
-unsigned int a, timeout = 0, timeout2 = 0, hatch = 3;                                                                                  //0-65535  hatch: 0-closed 1-opened 2-absent 3-dummy startup
+unsigned int a, timeout = 0, timeout2 = 0, hatch = 3, cCurrent = 0, hatchCurrent = 0;                                                  //0-65535  hatch: 0-closed 1-opened 2-absent 3-dummy startup
 byte Prinimaem[5], Posilaem[5], comandaRX = 0, comandaTX, RPMena = 0, IMUen = 0, LIDAR = 0;                                            //byte 0-255
 char rgb[] = "rgbypcwo";                                                                                                               //Smart Servo LEDS: 0-Red 1-Green 2-Blue 3-Yellow 4-Pink 5-Cyan 6-White 7-NoLED
 
@@ -53,6 +53,8 @@ void setup() {//====================================================SETUP=======
   pinMode(PA6, INPUT_PULLDOWN);       // TRACKS: tacho 2 in
   pinMode(PF2, OUTPUT);               // Speaker
   pinMode(PC0, INPUT_ANALOG);         // Voltage ADC in
+  pinMode(PC1, INPUT_ANALOG);         // hatchCurrent ADC in
+  pinMode(PC2, INPUT_ANALOG);         // cCurrent ADC in
   pinMode(PB0, OUTPUT);               // Lidar power EN (0-off)
   pinMode(PB9, OUTPUT);               // PWMservo EN    (0-on)
   pinMode(PF3, INPUT);                // Hatch 1
@@ -80,6 +82,7 @@ void setup() {//====================================================SETUP=======
   //  tfmini.begin(&Serial3);
   Wire.begin();
   Wire.setClock(400000L);                                                      // 400000, tipa 400Hz
+  randomSeed(analogRead(PA1));
   comandaTX = 98, dataTX = random(0, 65000), posilka(), delay(20);             // dlya nachala propihnut`, esli connection uzhe lost
   hatchStatus();                                                               // Check and update `hatch` var
   gpio_write_bit(GPIOB, 9, 0);                                                 // PWMservo power Enable
@@ -87,9 +90,14 @@ void setup() {//====================================================SETUP=======
   pwmController.init(B000000);                                                 // Address pins A5-A0 set to B000000
   pwmController.setPWMFrequency(100);                                          // Default is 200Hz, supports 24Hz to 1526Hz
   servo.setJointTorque(5, 1023), delay(50);                                    // LIDAR's torque. 0-1023, 100 ele-ele // LIDAR 400 def //1023 full
-  servo.moveJoint(5, current_lidar), delay(500);                               // LIDAR CENTER! current_lidar=501 = 2004 /4 +- hardware depends
-  pwmController.setChannelPWM(11, 700), servo.LED(5, &rgb[1]), delay(50);      // LIDAR DOWN (700-down, 456~-UP), Servo-green
-  gpio_write_bit(GPIOF, 3, 1), gpio_write_bit(GPIOF, 5, 0), hatch = 0;         // Close hatch
+
+  //servo.moveJoint(5, current_lidar), delay(500);                               // LIDAR CENTER! current_lidar=501 = 2004 /4 +- hardware depends
+  //pwmController.setChannelPWM(11, 700), servo.LED(5, &rgb[1]), delay(50);      // LIDAR DOWN (700-down, 456~-UP), Servo-green
+  //gpio_write_bit(GPIOF, 3, 1), gpio_write_bit(GPIOF, 5, 0), hatch = 0;         // Close hatch
+  if (hatch != 0) CLOSEDOWN();
+
+  pwmController.setChannelPWM(14, 1);                                          // Left headlight dim
+  pwmController.setChannelPWM(15, 1);                                          // Right headlight dim
 
   for ( unsigned char p = 0; p < 100; p++)                                     // Startup beep sound
   {
@@ -102,8 +110,9 @@ void setup() {//====================================================SETUP=======
 
   delay(100);
   voltage = analogRead(PC0);
-  randomSeed(analogRead(PA1));
-
+  hatchCurrent = analogRead(PC1);
+  cCurrent = analogRead(PC2);
+  
   if (myIMU.begin() == false)  {
     gpio_write_bit(GPIOG, 15, 0);  //============================if onboard LED on - reset stm32, automatic later
     while (1);
@@ -199,18 +208,23 @@ void prinimaem() {//=========================================================REC
   if (comandaRX == 42) servo.moveJoint(2, dataRX);
   if (comandaRX == 43) servo.moveJoint(3, dataRX);
   if (comandaRX == 44) servo.moveJoint(4, dataRX);
-  if (comandaRX == 116 and dataRX == 1) RPMena = 1;                                                                  //Start sending RPMs out.
-  if (comandaRX == 116 and dataRX == 0) RPMena = 0;                                                                  //Stop sending both RPMs.
-  //if ((comandaRX == 40) and (dataRX < 6))  comandaRX = 0, servoPOS();                                              //GetServoPos  5 serv-to - eto vremennaya hernya. ne pashet poka
-  if (comandaRX == 119 and dataRX == 10) myIMU.enableGameRotationVector(50), IMUen = 1;                              //def:50 - start update every 50ms from IMU, in real about 200ms
-  if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;                                //Stop IMU data  '''REMOVE, NOT NEEDED?'''
-  if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                                               //Move LIDAR
-  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDist();                                                //Get DISTANCE
-  if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();  //Get Battery's Voltage
-  if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                                           //Get hatch status
-  if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) turnRight();                                                //Perform turn based on IMU data. data allowed: 1-180
-  if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) turnLeft();                                                 //Perform turn based on IMU data. data allowed: 1-180
+  if (comandaRX == 116 and dataRX == 1) RPMena = 1;                                                                          //Start sending RPMs out.
+  if (comandaRX == 116 and dataRX == 0) RPMena = 0;                                                                          //Stop sending both RPMs.
+  //if ((comandaRX == 40) and (dataRX < 6))  comandaRX = 0, servoPOS();                                                      //GetServoPos  5 serv-to - eto vremennaya hernya. ne pashet poka
+  if (comandaRX == 119 and dataRX == 10) myIMU.enableGameRotationVector(50), IMUen = 1;                                      //def:50 - start update every 50ms from IMU, in real about 200ms
+  if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;                                        //Stop IMU data  '''REMOVE, NOT NEEDED?'''
+  if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                                                       //Move LIDAR
+  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDist();                                                        //Get DISTANCE
+  if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();          //Get Battery's Voltage
+  if ((comandaRX == 19) and (dataRX == 19)) cCurrent = analogRead(PC2), comandaTX = 19, dataTX = cCurrent, posilka();        //Get Battery's Voltage
+  //  if ((comandaRX == 18) and (dataRX == 18)) hatchCurrent = analogRead(PC1), comandaTX = 18, dataTX = hatchCurrent, posilka();//Get Battery's Voltage
+  if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                                                   //Get hatch status
+  if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) turnRight();                                                        //Perform turn based on IMU data. data allowed: 1-180
+  if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) turnLeft();                                                         //Perform turn based on IMU data. data allowed: 1-180
+  if (comandaRX == 14) pwmController.setChannelPWM(14, dataRX);                                                              //Left headlight
+  if (comandaRX == 15) pwmController.setChannelPWM(15, dataRX);                                                              //Right headlight
   comandaRX = 0;
+
 }//=========================================================RECEIVING END============================================================
 
 void posilka() {//=========================================================PACKET FORMING============================================================
@@ -236,7 +250,7 @@ void servoPOS() {//=======================================================getSer
   // gpio_write_bit(GPIOC, 3, HIGH);      //pc3  -hald-duplex control low = rx
 }
 
-//======================================Return the Euler angle structure from a Quaternion structure==========================================
+//======================================Return the Euler angle structure from a Quaternion structure. from example======================================
 Euler getAngles(Quat q) {
   Euler ret_val;
   float x; float y;
@@ -316,15 +330,38 @@ void hatchStatus() {//================================================ Hatch sta
 }
 
 void OPENUP() {//=================================================== OPENUP ========================================================
-  gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 1), delay(3000), hatch = 1;     //Open hatch
+  int mili = millis();
+  gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 1);//, delay(3000);
+
+  while ((millis() - mili) < 3000) {   // zamecheno overcurrent = 3210
+    delay(50);
+    if (analogRead(PC1) > 3210) {
+      gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 0);
+      comandaTX = 21, dataTX = 4,  posilka();
+      errorBeep();
+    }
+  }
+  hatch = 1;
   hatchStatus();
   if (hatch == 1) pwmController.setChannelPWM(11, 456), gpio_write_bit(GPIOB, 0, 1), servo.LED(5, &rgb[0]), LIDAR = 1;
   //while (Serial1.available())  char t = Serial1.read();                               //purge main serial
 }
 
 void CLOSEDOWN() {//================================================ CLOSEDOWN =====================================================
+  int mili = millis();
   gpio_write_bit(GPIOB, 0, 0), servo.moveJoint(5, 501), delay(500), pwmController.setChannelPWM(11, 700), servo.LED(5, &rgb[1]), delay(75), LIDAR = 0;
-  gpio_write_bit(GPIOF, 3, 1), gpio_write_bit(GPIOF, 5, 0), hatch = 0;               //Close hatch
+  gpio_write_bit(GPIOF, 3, 1), gpio_write_bit(GPIOF, 5, 0);               //Close hatch
+
+  while ((millis() - mili) < 3800) {   // zamecheno overcurrent = 3210
+    delay(50);
+    if (analogRead(PC1) > 3210) {
+      gpio_write_bit(GPIOF, 3, 0), gpio_write_bit(GPIOF, 5, 0);
+      comandaTX = 21, dataTX = 4,  posilka();
+      errorBeep();
+    }
+  }
+  hatch = 0;
+  hatchStatus();
   while (Serial1.available())  char t = Serial1.read();                              //purge main serial
 }
 
@@ -350,6 +387,7 @@ void getYAW() {//================================================ GetYAW =======
 }
 
 void turnRight() {//================================================AUTO Turn RIGHT =====================================================
+  int oldYAW = heading, neKrutitsa = 0;
   gpio_write_bit(GPIOF, 12, 1);                                               //Enable right
   gpio_write_bit(GPIOF, 14, 1);                                               //Enable left
   gpio_write_bit(GPIOF, 11, 1);                                               //Dir right
@@ -357,28 +395,45 @@ void turnRight() {//================================================AUTO Turn RI
   dac_write_channel(DAC, DAC_CH1, 350), dac_write_channel(DAC, DAC_CH2, 350); //Set speeds 180-1200
   TargetTurn = heading + dataRX;                                              //Mozhet bit azh 359+180= 539
   if (TargetTurn > 359) {                                                     //tut idet 0-179 // +overturn
-    gpio_write_bit(GPIOG, 15, 0);
     TargetTurn = TargetTurn - 360;
     while (heading > 4) {                                                     //slozhnii variant
       delay(10);
       while (Serial1.available())  char t = Serial1.read();                   //purge main serial
-      getYAW();
+      oldYAW = heading, getYAW();
+      if (oldYAW == heading) neKrutitsa ++;
+      if (oldYAW != heading) neKrutitsa = 0;
+      if (neKrutitsa >= 33){
+        comandaTX = 32, dataTX = 1000, posilka();
+        errorBeep();
+        goto vse;
+      }
     }
   }
+  neKrutitsa = 0;
   while (TargetTurn > heading) {                                              //prostoi variant
     delay(10);
     while (Serial1.available())  char t = Serial1.read();  //purge main serial
-    getYAW();
+    oldYAW = heading, getYAW();
+    if (oldYAW == heading) neKrutitsa ++;
+    if (oldYAW != heading) neKrutitsa = 0;
+    if (neKrutitsa >= 33){
+      comandaTX = 32, dataTX = 1000, posilka();
+      errorBeep();
+      goto vse;
+    }
   }
+  vse:
+  neKrutitsa = 0;
   dac_write_channel(DAC, DAC_CH1, 0);                                         //Set right 180-1200
   dac_write_channel(DAC, DAC_CH2, 0);                                         //Set left  180-1200
   gpio_write_bit(GPIOF, 12, 0);                                               //Disable right
   gpio_write_bit(GPIOF, 14, 0);                                               //Disable left
-  delay(50);
+  delay(75);
   comandaTX = 32, dataTX = abs(heading - TargetTurn), posilka();              //Return real turn summary
 }
 
 void turnLeft() {//================================================AUTO Turn LEFT =====================================================
+  int oldYAW = heading, neKrutitsa = 0;
   gpio_write_bit(GPIOF, 12, 1);                                               //Enable right
   gpio_write_bit(GPIOF, 14, 1);                                               //Enable left
   gpio_write_bit(GPIOF, 11, 0);                                               //Dir right
@@ -386,24 +441,57 @@ void turnLeft() {//================================================AUTO Turn LEF
   dac_write_channel(DAC, DAC_CH1, 350), dac_write_channel(DAC, DAC_CH2, 350); //Set speeds  180-1200
   TargetTurn = heading - dataRX;                                              //Mozhet bit azh 0-180= -180
   if (TargetTurn < 0) {                                                       //tut idet 0 -179 // +overturn
-    gpio_write_bit(GPIOG, 15, 0);
     TargetTurn = TargetTurn + 360;
     while (heading < 355) {                                                   // slozhnii variant
       delay(10);
       while (Serial1.available())  char t = Serial1.read();  //purge main serial
-      getYAW();
+      oldYAW = heading, getYAW();
+      if (oldYAW == heading) neKrutitsa ++;
+      if (oldYAW != heading) neKrutitsa = 0;
+      if (neKrutitsa >= 33) {
+        comandaTX = 33, dataTX = 1000, posilka();
+        errorBeep();
+        goto vse;
+      }
     }
   }
-  gpio_write_bit(GPIOG, 15, 1);
+  neKrutitsa = 0;
   while (TargetTurn < heading) {                                              // prostoi variant
     delay(10);
     while (Serial1.available())  char t = Serial1.read();                     //purge main serial
-    getYAW();
+    oldYAW = heading, getYAW();
+    if (oldYAW == heading) neKrutitsa ++;
+    if (oldYAW != heading) neKrutitsa = 0;    
+    if (neKrutitsa >= 33) {
+      comandaTX = 33, dataTX = 1000, posilka();
+      errorBeep();
+      goto vse;
+    }
   }
+  vse:
+  neKrutitsa = 0;
   dac_write_channel(DAC, DAC_CH1, 0);                                         //Set right 180-1200
   dac_write_channel(DAC, DAC_CH2, 0);                                         //Set left  180-1200
   gpio_write_bit(GPIOF, 12, 0);                                               //Disable right
   gpio_write_bit(GPIOF, 14, 0);                                               //Disable left
-  delay(50);
+  delay(75);
   comandaTX = 33, dataTX = abs(heading - TargetTurn), posilka();              //Return real turn summary
+}
+
+void errorBeep() {                                                            // ERROR beep sound
+  for ( unsigned char p = 0; p < 100; p++)
+  {
+    digitalWrite(PF2, HIGH);
+    delay(1);//wait for 1ms
+    digitalWrite(PF2, LOW);
+    delay(1);//wait for 1ms
+  }
+  for ( unsigned char p = 0; p < 100; p++)
+  {
+    digitalWrite(PF2, HIGH);
+    delay(2);//wait for 1ms
+    digitalWrite(PF2, LOW);
+    delay(2);//wait for 1ms
+  }
+  while (Serial1.available())  char t = Serial1.read();                              //purge main serial
 }
