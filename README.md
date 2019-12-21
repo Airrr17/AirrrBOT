@@ -29,7 +29,7 @@ To DO:
 -- Fully auto moveing forward at any desired range in two modes: LIDAR or RPM's counting.  
 -- Faster 300 degree map acquirement.  
   
-  
+![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/picture01.jpg)  
   
 The PACKET (bi-directional) is a 5 bytes array sent byte by byte (UDP on ip:port)  
 ---------------------------------------------  
