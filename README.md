@@ -18,7 +18,7 @@ This code is under development.
   Once failed to rotate an error message being reported, also difference between angles reported.  
 --Can draw a map of it's current location in 0.29 degree resolution. Much slow for now :(  
   
-OrangePI zero used for converting from tcp-ip to 1Mb serial routed in stm32f103zet6 as main controller.  
+OrangePI zero used for converting from tcp-ip to 0.5Mb serial routed in stm32f103zet6 as main controller.  
 BNO080 as compass*  
 XL320 servos directly form STM32.  
 PCA9685 16ch PWM controller.  
@@ -30,6 +30,8 @@ To DO:
 -- Faster 300 degree map acquirement.  
   
 ![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/picture01.jpg)  
+  
+![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/block.png)  
   
 The PACKET (bi-directional) is a 5 bytes array sent byte by byte (UDP on ip:port)  
 ---------------------------------------------  
