@@ -1,8 +1,14 @@
 ## ROBOT4 by (c)Airrr(r) 22.12.2019  
   
-This is a HOST(robot) part of AirrrBOT as seen on  
-  
+This is a HOST(robot) part of AirrrBOT code as seen on  
 https://www.youtube.com/user/AirrrOk  
+  
+  
+Server part can be implemeted in any language.  
+Currently it is done in VB.NET  
+See somehow poorly discribed API below.  
+  
+
   
 This code is under development.  
   
@@ -45,11 +51,11 @@ The PACKET (bi-directional) is a 5 bytes array sent byte by byte (UDP on ip:port
 ---------------------------------------------  
 ABSTRACT:  
    
-API consists of two concurrent modes: scout and manual.  
+API consists of two concurrent modes: scout and manual. Some commands can be used in a selected mode, some both.  
 Modes definition:  
-(S)-Scout:  Manipulator (with camera) are constantly above LIDAR and pointed 0(360) degrees forward (unmovable). LIDAR are ready (hatch are opened of course).  
-(M)-Manual: LIDAR are hidden (down) while hatch can be open or closed. Manipulator are enabled. Totally depends on operator. No automatic function are engaged.  
-(B)-Both:   Other commands that NOT combine manipulator movement and LIDAR being up and enabled to prevent manipulator-LIDAR collision.  
+(S)-Scout:  Manipulator (with camera) are constantly above the LIDAR and pointed 0(360) degrees forward (unmovable). LIDAR are ready (hatch are opened of course).  
+(M)-Manual: LIDAR are hidden (down) while hatch can be open or closed. Manipulator are enabled. Totally depends on operator. About no automatic function are engaged.  
+(B)-Both:   Other commands that NOT combine manipulator movement and LIDAR being up and enabled to prevent manipulator<->LIDAR collision.  
   
 ******this manual describes (B) or (S) modes as long for now******  
   
