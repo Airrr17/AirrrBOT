@@ -1,6 +1,6 @@
-#include "libmaple\dac.h"                     //Generic STM32F103Z // tested 15.08.19 //AirrrBOT
+#include "libmaple\dac.h"                     //Generic STM32F103Z // tested 14.06.20 //AirrrBOT
 #include <Wire.h>
-#include "XL320.h"                            //Smart Digital Servos
+#include "XL320.h"                            //Smart Digital Servos, modifyed: search "int XL320::getJointPosition(int id)" in XL320.cpp
 #include <math.h>
 #include <Adafruit_GFX.h>                     //OLED Debug secreen, absent for now.
 #include <Adafruit_SSD1306_STM32.h>           //OLED
@@ -12,8 +12,8 @@
 
 #define OLED_RESET -1
 
-unsigned int voltage = 0, rpm = 0, rpm2 = 0, rpm_old, rpm2_old, dataRX = 0, dataTX, servPOS = 0, current_lidar = 501, headingTemp = 0; //0-65535
-int bias, pwmR = 0, pwmL = 0, heading = 0, TargetTurn = 0;                                                                             //-32768 - 32767
+unsigned int voltage = 0, rpm = 0, rpm2 = 0, rpm_old, rpm2_old, dataRX = 0, dataTX, current_lidar = 501, headingTemp = 0;              //0-65535
+int bias, pwmR = 0, pwmL = 0, heading = 0, TargetTurn = 0, servPOS = 0;                                                                //-32768 - 32767
 unsigned int a, timeout = 0, timeout2 = 0, hatch = 3, cCurrent = 0, hatchCurrent = 0;                                                  //0-65535  hatch: 0-closed 1-opened 2-absent 3-dummy startup
 byte Prinimaem[5], Posilaem[5], comandaRX = 0, comandaTX, RPMena = 0, IMUen = 0, LIDAR = 0;                                            //byte 0-255
 char rgb[] = "rgbypcwo";                                                                                                               //Smart Servo LEDS: 0-Red 1-Green 2-Blue 3-Yellow 4-Pink 5-Cyan 6-White 7-NoLED
@@ -61,12 +61,12 @@ void setup() {//====================================================SETUP=======
   pinMode(PF5, INPUT);                // Hatch 2
   pinMode(PB8, OUTPUT);               // BNO080 reset
   pinMode(PB5, INPUT_PULLUP);         // BNO080 Interrupt, active low, pulls low when the BNO080 is ready for communication
+  pinMode(PA1, OUTPUT);               //pc3  -hald-duplex control (74hc241 or MAX485)
+  gpio_write_bit(GPIOA, 1, HIGH);     //pc3  -hald-duplex control SEE "XL320.cpp" for this pin. HIGH = to servo. ENABLE XL320 CONTROL
   gpio_write_bit(GPIOG, 15, 0), gpio_write_bit(GPIOB, 8, 0), delay(250), gpio_write_bit(GPIOG, 15, 1), gpio_write_bit(GPIOB, 8, 1), delay(250);   //LED blink + IMU reset
   gpio_write_bit(GPIOF, 11, 0), gpio_write_bit(GPIOF, 12, 1), gpio_write_bit(GPIOF, 13, 0), gpio_write_bit(GPIOF, 14, 1);                         //TEMP for motors enabled & forward
   gpio_write_bit(GPIOB, 0, 0);        //Lidar power Disable
   gpio_write_bit(GPIOB, 9, 1);        //PWMservo power Disable
-  //pinMode(PC3, OUTPUT);               //pc3  -hald-duplex control
-  //gpio_write_bit(GPIOC, 3, HIGH);     //pc3  -hald-duplex control
 
   dac_init(DAC, DAC_CH1 | DAC_CH2);   // Enable both DAC channels (Channel 1 and Channel 2).
   pinMode(PA4, OUTPUT);               // DAC_CH1 shares the same pin with SPI1_NSS pin (PA4). So it has to be initialized again, as output.
@@ -90,6 +90,8 @@ void setup() {//====================================================SETUP=======
   pwmController.init(B000000);                                                 // Address pins A5-A0 set to B000000
   pwmController.setPWMFrequency(100);                                          // Default is 200Hz, supports 24Hz to 1526Hz
   servo.setJointTorque(5, 1023), delay(50);                                    // LIDAR's torque. 0-1023, 100 ele-ele // LIDAR 400 def //1023 full
+  servo.setJointTorque(1, 250);                                               // Base's torque. 0-1023, 100 ele-ele  //1023 full
+  servo.setJointSpeed(1, 100);                                                // 1023-Full speed
 
   //servo.moveJoint(5, current_lidar), delay(500);                               // LIDAR CENTER! current_lidar=501 = 2004 /4 +- hardware depends
   //pwmController.setChannelPWM(11, 700), servo.LED(5, &rgb[1]), delay(50);      // LIDAR DOWN (700-down, 456~-UP), Servo-green
@@ -112,7 +114,7 @@ void setup() {//====================================================SETUP=======
   voltage = analogRead(PC0);
   hatchCurrent = analogRead(PC1);
   cCurrent = analogRead(PC2);
-  
+
   if (myIMU.begin() == false)  {
     gpio_write_bit(GPIOG, 15, 0);  //============================if onboard LED on - reset stm32, automatic later
     while (1);
@@ -208,21 +210,21 @@ void prinimaem() {//=========================================================REC
   if (comandaRX == 42) servo.moveJoint(2, dataRX);
   if (comandaRX == 43) servo.moveJoint(3, dataRX);
   if (comandaRX == 44) servo.moveJoint(4, dataRX);
-  if (comandaRX == 116 and dataRX == 1) RPMena = 1;                                                                          //Start sending RPMs out.
-  if (comandaRX == 116 and dataRX == 0) RPMena = 0;                                                                          //Stop sending both RPMs.
-  //if ((comandaRX == 40) and (dataRX < 6))  comandaRX = 0, servoPOS();                                                      //GetServoPos  5 serv-to - eto vremennaya hernya. ne pashet poka
-  if (comandaRX == 119 and dataRX == 10) myIMU.enableGameRotationVector(50), IMUen = 1;                                      //def:50 - start update every 50ms from IMU, in real about 200ms
-  if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;                                        //Stop IMU data  '''REMOVE, NOT NEEDED?'''
-  if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                                                       //Move LIDAR
-  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDist();                                                        //Get DISTANCE
-  if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();          //Get Battery's Voltage
-  if ((comandaRX == 19) and (dataRX == 19)) cCurrent = analogRead(PC2), comandaTX = 19, dataTX = cCurrent, posilka();        //Get Battery's Voltage
-  //  if ((comandaRX == 18) and (dataRX == 18)) hatchCurrent = analogRead(PC1), comandaTX = 18, dataTX = hatchCurrent, posilka();//Get Battery's Voltage
-  if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                                                   //Get hatch status
-  if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) turnRight();                                                        //Perform turn based on IMU data. data allowed: 1-180
-  if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) turnLeft();                                                         //Perform turn based on IMU data. data allowed: 1-180
-  if (comandaRX == 14) pwmController.setChannelPWM(14, dataRX);                                                              //Left headlight
-  if (comandaRX == 15) pwmController.setChannelPWM(15, dataRX);                                                              //Right headlight
+  if (comandaRX == 116 and dataRX == 1) RPMena = 1;                                                                             //Start sending RPMs out.
+  if (comandaRX == 116 and dataRX == 0) RPMena = 0;                                                                             //Stop sending both RPMs.
+  if ((comandaRX == 45) and (dataRX < 6))  comandaRX = 0, servoPOS();                                                           //GetServoPos  5 serv-to - #5 na lidare
+  if (comandaRX == 119 and dataRX == 10) myIMU.enableGameRotationVector(50), IMUen = 1;                                         //def:50 - start update every 50ms from IMU, in real about 200ms
+  if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;                                           //Stop IMU data  '''REMOVE, NOT NEEDED?'''
+  if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                                                          //Move LIDAR
+  if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDist();                                                           //Get DISTANCE
+  if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();             //Get Battery's Voltage
+  if ((comandaRX == 19) and (dataRX == 19)) cCurrent = analogRead(PC2), comandaTX = 19, dataTX = cCurrent, posilka();           //Get robot's current
+  //if ((comandaRX == 18) and (dataRX == 18)) hatchCurrent = analogRead(PC1), comandaTX = 18, dataTX = hatchCurrent, posilka(); //Return hatch's motor current
+  if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                                                      //Get hatch status
+  if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) turnRight();                                                           //Perform turn based on IMU data. data allowed: 1-180
+  if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) turnLeft();                                                            //Perform turn based on IMU data. data allowed: 1-180
+  if (comandaRX == 14) pwmController.setChannelPWM(14, dataRX);                                                                 //Left headlight
+  if (comandaRX == 15) pwmController.setChannelPWM(15, dataRX);                                                                 //Right headlight
   comandaRX = 0;
 
 }//=========================================================RECEIVING END============================================================
@@ -238,16 +240,11 @@ void posilka() {//=========================================================PACKE
 
 
 void servoPOS() {//=======================================================getServoPosition=========================================================
-  // servPOS = 0; //              scroll down)
-  //  servPOS = servo.getJointPosition(dataRX);      // 3 kostilya  koroch eshe ne pashet
-  //  gpio_write_bit(GPIOC, 3, LOW);                 //pc3  -hald-duplex control low = rx
-  //  delay(500);                                    //Default value Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В250Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›(500[Р В РЎвЂєР РЋР’Вsec])  //delayMicroseconds
-
-  // if (Serial2.available() >= 1) {
-  //while(Serial2.available()) ;
-  //   comandaTX = 40, dataTX = Serial2.available(), posilka();
-  //
-  // gpio_write_bit(GPIOC, 3, HIGH);      //pc3  -hald-duplex control low = rx
+  servPOS = 0;
+  servPOS = servo.getJointPosition(dataRX);
+  if (servPOS < 0) servPOS = 2002 + servPOS;                                //-2 servo not detected, -1 packet error. So set `range` abnormal value. Represent error #.
+  unsigned int complexPosition = (dataRX << 11) | servPOS;                  //bit0-10 10-bit position, bit 11-15 servo #.
+  comandaTX = 45, dataTX = complexPosition,  posilka();                     //sendout requested servo's position.
 }
 
 //======================================Return the Euler angle structure from a Quaternion structure. from example======================================
@@ -402,7 +399,7 @@ void turnRight() {//================================================AUTO Turn RI
       oldYAW = heading, getYAW();
       if (oldYAW == heading) neKrutitsa ++;
       if (oldYAW != heading) neKrutitsa = 0;
-      if (neKrutitsa >= 33){                                                  //Doesn't turn?
+      if (neKrutitsa >= 33) {                                                 //Doesn't turn?
         comandaTX = 32, dataTX = 1000, posilka();
         errorBeep();
         goto vse;
@@ -416,13 +413,13 @@ void turnRight() {//================================================AUTO Turn RI
     oldYAW = heading, getYAW();
     if (oldYAW == heading) neKrutitsa ++;
     if (oldYAW != heading) neKrutitsa = 0;
-    if (neKrutitsa >= 33){                                                    //Doesn't turn?
+    if (neKrutitsa >= 33) {                                                   //Doesn't turn?
       comandaTX = 32, dataTX = 1000, posilka();
       errorBeep();
       goto vse;
     }
   }
-  vse:
+vse:
   neKrutitsa = 0;
   dac_write_channel(DAC, DAC_CH1, 0);                                         //Set right 180-1200
   dac_write_channel(DAC, DAC_CH2, 0);                                         //Set left  180-1200
@@ -461,14 +458,14 @@ void turnLeft() {//================================================AUTO Turn LEF
     while (Serial1.available())  char t = Serial1.read();                     //purge main serial
     oldYAW = heading, getYAW();
     if (oldYAW == heading) neKrutitsa ++;
-    if (oldYAW != heading) neKrutitsa = 0;    
-    if (neKrutitsa >= 33) {                                                   //Doesn't turn? 
+    if (oldYAW != heading) neKrutitsa = 0;
+    if (neKrutitsa >= 33) {                                                   //Doesn't turn?
       comandaTX = 33, dataTX = 1000, posilka();
       errorBeep();
       goto vse;
     }
   }
-  vse:
+vse:
   neKrutitsa = 0;
   dac_write_channel(DAC, DAC_CH1, 0);                                         //Set right 180-1200
   dac_write_channel(DAC, DAC_CH2, 0);                                         //Set left  180-1200

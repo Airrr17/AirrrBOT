@@ -23,6 +23,7 @@ This code is under development.
 --Rotate automatically to any desired angle 1-180 cw or ccw. Reporting back difference between rotated and desired angle.  
   Once failed to rotate an error message being reported, also difference between angles reported.  
 --Can draw a map of it's current location in 0.29 degree resolution. Much slow for now :(  
+--Servo positions are readable.  
   
 OrangePI zero used for converting from tcp-ip to 0.5Mb serial routed in stm32f103zet6 as main controller.  
 BNO080 as compass*  
@@ -70,6 +71,13 @@ And two types of commands: one-directional(1)- only order to implement OR bi-dir
   
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ START HERE @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  
 COMMANDS:  
+  
+(B)(1): Set head lights.  
+  REQ: command 14,15, data 0-4095. Right and left is independed. 
+  
+(B)(2): Get servo position.  
+  REQ: command 45, data = servo #, 1-5  
+  ANS: command 45, data = (0-1023) plus bit11-13 = servo #. Position: 2000 = servo absent, 2001 = packet error.  
   
 (B)(2): Get battery voltage.  
   REQ: command 20, data 20  
