@@ -1,8 +1,8 @@
-#include "libmaple\dac.h"                     //Generic STM32F103Z // tested 14.06.20 //AirrrBOT
+#include "libmaple\dac.h"                     //Generic STM32F103Z // tested 28.06.20 //AirrrBOT
 #include <Wire.h>
 #include "XL320.h"                            //Smart Digital Servos, modifyed: search "int XL320::getJointPosition(int id)" in XL320.cpp
 #include <math.h>
-#include <Adafruit_GFX.h>                     //OLED Debug secreen, absent for now.
+#include <Adafruit_GFX.h>                     //OLED Debug secreen. v 1.7.5
 #include <Adafruit_SSD1306_STM32.h>           //OLED
 #include "PCA9685.h"                          //16-ch analog servo controller (PWM) also controlling LEDs
 #include "SparkFun_BNO080_Arduino_Library.h"  //IMU - Inertial Measurement Unit (+ magnetic compass, not used now, drifting)
@@ -43,7 +43,6 @@ Euler eul;
 //====================================================IMU variables====================================================
 
 void setup() {//====================================================SETUP====================================================
-  //>>>>>LEAVE PA1 UNCONNECTED. Used to get random seed.
   pinMode(PG15, OUTPUT);              // On-board LED
   pinMode(PF12, OUTPUT);              // TRACKS: EN1
   pinMode(PF14, OUTPUT);              // TRACKS: EN2
@@ -82,7 +81,7 @@ void setup() {//====================================================SETUP=======
   //  tfmini.begin(&Serial3);
   Wire.begin();
   Wire.setClock(400000L);                                                      // 400000, tipa 400Hz
-  randomSeed(analogRead(PA1));
+  //randomSeed(analogRead(PA1));
   comandaTX = 98, dataTX = random(0, 65000), posilka(), delay(20);             // dlya nachala propihnut`, esli connection uzhe lost
   hatchStatus();                                                               // Check and update `hatch` var
   gpio_write_bit(GPIOB, 9, 0);                                                 // PWMservo power Enable
@@ -125,14 +124,7 @@ void setup() {//====================================================SETUP=======
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
-  display.println("ROBOT4 Starting.");
-  display.println("someline1");
-  display.println("someline2");
-  display.println("someline3");
-  display.println("someline4");
-  display.println("someline5");
-  display.println("someline6");
-  display.print("SOME");
+  display.println("  ROBOT4 28.06.2020");
   display.display();
   //====================================================Tachometers routine====================================================
   Timer2.pause();
@@ -217,14 +209,16 @@ void prinimaem() {//=========================================================REC
   if (comandaRX == 119 and dataRX == 0) myIMU.enableGameRotationVector(0), IMUen = 0;                                           //Stop IMU data  '''REMOVE, NOT NEEDED?'''
   if ((comandaRX == 40) and (LIDAR == 1)) moveLIDAR();                                                                          //Move LIDAR
   if ((comandaRX == 50) and dataRX == 50 and (LIDAR == 1)) getDist();                                                           //Get DISTANCE
+  if ((comandaRX == 51) and dataRX < 1024 and (LIDAR == 1)) getDistNew();                                                       //Get DISTANCE new implementation
   if ((comandaRX == 20) and (dataRX == 20)) voltage = analogRead(PC0), comandaTX = 20, dataTX = voltage, posilka();             //Get Battery's Voltage
   if ((comandaRX == 19) and (dataRX == 19)) cCurrent = analogRead(PC2), comandaTX = 19, dataTX = cCurrent, posilka();           //Get robot's current
   //if ((comandaRX == 18) and (dataRX == 18)) hatchCurrent = analogRead(PC1), comandaTX = 18, dataTX = hatchCurrent, posilka(); //Return hatch's motor current
   if ((comandaRX == 21) and (dataRX == 21)) hatchStatus();                                                                      //Get hatch status
   if ((comandaRX == 32) and dataRX > 0 and dataRX < 181) turnRight();                                                           //Perform turn based on IMU data. data allowed: 1-180
   if ((comandaRX == 33) and dataRX > 0 and dataRX < 181) turnLeft();                                                            //Perform turn based on IMU data. data allowed: 1-180
-  if (comandaRX == 14) pwmController.setChannelPWM(14, dataRX);                                                                 //Left headlight
-  if (comandaRX == 15) pwmController.setChannelPWM(15, dataRX);                                                                 //Right headlight
+  if ((comandaRX == 14) and (dataRX < 4095)) pwmController.setChannelPWM(14, dataRX);                                           //Left headlight
+  if ((comandaRX == 15) and (dataRX < 4095)) pwmController.setChannelPWM(15, dataRX);                                           //Right headlight
+  if (comandaRX == 55 and dataRX == 55) comandaTX = 55, dataTX = 55, posilka();                                                 //Ping
   comandaRX = 0;
 
 }//=========================================================RECEIVING END============================================================
@@ -265,7 +259,7 @@ Euler getAngles(Quat q) {
   return ret_val;
 }
 
-void moveLIDAR() {//======================================================= rotateLIDAR =========================================================
+void moveLIDAR() {//======================================================= moveLIDAR =========================================================
   current_lidar = dataRX;
   servo.moveJoint(5, current_lidar);
   //  servo.LED(5, &rgb[random(0, 7)]);   //one can setup color
@@ -277,12 +271,48 @@ void getDist() {//================================================ Distance at c
   //delay(40);
   int distance = 0;
   int strength = 0;
-  getTFminiData(&distance, &strength);
+//  getTFminiData(&distance, &strength);                           //hvatit?
   while (!distance) {
     getTFminiData(&distance, &strength);
     if (distance) {
       comandaTX = 50, dataTX = distance;
       posilka();
+      comandaRX = 0;
+    }
+  }
+}
+void getDistNew() {//================================================ Distance NEW implementation =====================================================
+  int distance = 0;
+  int strength = 0;
+  servo.moveJoint(5, dataRX);                                      //dvigaem na tsel'
+
+  int raznitsa = current_lidar - dataRX;
+  raznitsa = abs(raznitsa) + 10;                                   // 10ms = 100Hz of TFmini
+
+  current_lidar = dataRX;
+  //getTFminiData(&distance, &strength);                             //fire raz
+
+  delay (raznitsa);                                                // tut  dynamic delay !!!!!!!!!!!!!!!!!!!!
+
+  while (!distance) {
+    getTFminiData(&distance, &strength);                           //fire dva??!!
+    if (distance) {
+      // stelnut' eshe paru raz mozhet?
+
+
+      // zapakovat' "R"+distance+current_lidar
+      comandaTX = current_lidar;                                   // comandaTX = pervie 8 bit beret iz 12ti prosto
+      unsigned int temp_forming = current_lidar >> 8;              // ostalnie 4 bita
+      if (distance > 6666) distance == 6666;                       //mozhet ne nado, potom ogranichit'. mozhet 1200?
+      dataTX = (temp_forming << 12) | distance;                    //dvigaem te 4 bita i nakladivaem na 12 bit distancii
+
+      Posilaem[0] = 82;            //R - radar?
+      Posilaem[1] = comandaTX;
+      Posilaem[2] = dataTX >> 8;
+      Posilaem[3] = dataTX & 0xff;
+      Posilaem[4] = (Posilaem[0] xor Posilaem[1] xor Posilaem[2] xor Posilaem[3]);
+      Serial1.write (Posilaem, 5);
+
       comandaRX = 0;
     }
   }
