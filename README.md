@@ -8,7 +8,7 @@ Server part can be implemeted in any language.
 Currently it is done in VB.NET  
 See somehow poorly discribed API below.  
   
-
+  
   
 This code is under development.  
   
@@ -38,6 +38,9 @@ To DO:
 ![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/picture01.jpg)  
   
 ![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/block.png)  
+  
+  
+  
   
 The PACKET (bi-directional) is a 5 bytes array sent byte by byte (UDP on ip:port)  
 ---------------------------------------------  
