@@ -48,8 +48,13 @@ The packet (bi-dir) is a 5 bytes array (UDP ip:port)
 #3+#4- data (two bytes combined in short), short  
 #5-    checksum, all xor, byte  
   
-*From here and further only two variables are used: #2(command[0-255]) and #3+#4 (data[0-65535])  
+From here and further only two variables are used: #2(command[0-255]) and #3+#4 (data[0-65535])  
 (As startbyte is a constant. Checksum are autocalculated.)  
 [65][0-255][0-65535][xor]  
 ---------------------------------------------  
 For list of commands see .doc file.  
+  
+  
+![alt text](https://github.com/Airrr17/AirrrBOT/blob/master/soul.jpg)  
+  
+  
