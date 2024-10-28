@@ -3,9 +3,18 @@
   
   
 Control part can be implemeted in any language.  
-See C# demonstrator example software for controlling details.  
+See C# example software sources for controlling details.  
   
   
+&nbsp;
+  
+Chassis test: https://www.youtube.com/watch?v=97us4vYNSSo  
+IMU test: https://www.youtube.com/watch?v=sDaEpY1wi44  
+IMU 3D test: https://www.youtube.com/watch?v=kyKQOwIYwhY  
+Motors test: https://www.youtube.com/watch?v=D2VgjsKLWxw  
+Hatch and scan test: https://www.youtube.com/watch?v=qW2QI6ZfA34  
+  
+&nbsp;
   
 The code is under development.  
   
@@ -28,14 +37,16 @@ Main abilities:
   So can draw a map of it's current location in 0.29 degree resolution and 0.3 to 1.2 meter range.  
 - **Servo positions are readable.**  
   
-OrangePI zero are used for converting udp to 0.5Mbps serial for **STM32f103zet6** as main controller:  
+OrangePI zero are used for converting UDP to 0.5Mbps serial for **STM32f103zet6** as main controller.  
   
-Also it sends video over network from h264 hardware usb camera.  
+Also it sends video over network from h264 hardware usb camera (Will be placed on arm).  
   
 BNO080 as IMU.  
 XL320 servos directly form STM32.  
 PCA9685 16ch PWM controller.  
 TFmini as LIDAR (LED actually).  
+SSD1306 as debug screen.  
+BLDC motors come from RET module of cellular base station antenna with it's own L6235D controllers.  
   
 Next:  
 - Attach arm with gripper and camera.  
@@ -59,11 +70,8 @@ At last xor of all of them.
 There is a special packeting to scan surrounding fast that involves other packet forming. But still the packet is a 5 bytes in a sequence starting with "A".  
 On receive you'll get the same five-byte coding while structure of bytes remains the same as sending.  
   
-&nbsp;
-  
-Chassis test: https://www.youtube.com/watch?v=97us4vYNSSo  
-IMU test: https://www.youtube.com/watch?v=sDaEpY1wi44  
-Motors test: https://www.youtube.com/watch?v=D2VgjsKLWxw  
+
+
  
 
   
